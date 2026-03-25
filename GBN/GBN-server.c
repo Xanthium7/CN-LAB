@@ -11,7 +11,7 @@
 
 void sendAck(int sockfd, int ack) {
     char buff[MAX];
-    snprintf(buff, sizeof(buff), "%d", ack);
+    sprintf(buff, "%d", ack);
     send(sockfd, buff, sizeof(buff), 0);
 }
 
@@ -56,7 +56,7 @@ int main() {
 
         f = atoi(buff);
 
-        // Check if frame is the one we expect
+        // Check if frame is not the one we expect
         if (f != next) {
             printf("Frame %d discarded (Expected: %d). Sending ACK for %d\n", f, next, next - 1);
             sendAck(connfd, next - 1);
@@ -68,10 +68,7 @@ int main() {
         if (r == 0) { // Simulate Packet Loss
             printf("Frame %d was lost (Simulated)\n", f);
             continue; 
-        } else if (r == 1) { // Simulate Delay
-            printf("Frame %d delayed...\n", f);
-            sleep(1);
-        }
+        } 
 
         printf("Frame %d received. Sending ACK %d\n", f, f);
         sendAck(connfd, f);
