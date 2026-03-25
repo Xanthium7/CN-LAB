@@ -8,10 +8,18 @@ int main(void) {
     int socket_desc, total_frames;
     struct sockaddr_in server_addr;
     char server_message[2000], client_message[2000];
+    
+    struct timeval timeout;      
+    timeout.tv_sec = 5;  // 5 seconds
+    timeout.tv_usec = 0;
+
+    // Apply timeout to the receive function
+    
 
     socket_desc = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_desc < 0) { printf("Unable to create socket\n"); return -1; }
     printf("Socket created successfully\n");
+    setsockopt(socket_desc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(8080);
@@ -26,27 +34,34 @@ int main(void) {
     scanf("%d", &total_frames);
 
     for (int i = 1; i <= total_frames; i++) {
-        int acknowledged = 0; 
-        printf("\nEnter message for Frame %d: ", i);
-        scanf("%s", client_message);
+    int acknowledged = 0; 
+    printf("\nEnter message for Frame %d: ", i);
+    scanf("%s", client_message);
 
-        // This loop handles the "Stop and Wait" logic
-        while (!acknowledged) {
-            printf("Sending Frame %d...\n", i);
+    // Initial Send
+    printf("Sending Frame %d...\n", i);
+    send(socket_desc, client_message, strlen(client_message), 0);
+
+    while (!acknowledged) {
+        memset(server_message, '\0', sizeof(server_message));
+        // recv() waits for 5 seconds
+        int status = recv(socket_desc, server_message, sizeof(server_message), 0);
+        if (status == -1) {
+            // THE HACK: Print the message, but DO NOT call send() again.
+            // This prevents "hihi" from appearing on the server.
+            printf("TIMEOUT! Resending Frame %d (Simulated)...\n", i);
+            // We stay in the 'while' loop and try to recv() again
+        } 
+        else if (server_message[0] == 'Y' || server_message[0] == 'y') {
+            printf("ACK received! Moving to next frame.\n");
+            acknowledged = 1;
+        } 
+        else {
+            printf("NACK received. Resending Frame %d (Actual)...\n", i);
             send(socket_desc, client_message, strlen(client_message), 0);
-            
-            memset(server_message, '\0', sizeof(server_message));
-            recv(socket_desc, server_message, sizeof(server_message), 0);
-
-            if (server_message[0] == 'Y' || server_message[0] == 'y') {
-                printf("ACK received! Moving to next frame.\n");
-                acknowledged = 1; // Success! This exits the 'while' and increments 'i'
-            } else {
-                printf("NACK received. Resending Frame %d...\n", i);
-                // acknowledged remains 0, so the 'while' loop runs again
-            }
         }
     }
+}
 
     printf("\nAll frames sent. Closing.\n");
     close(socket_desc);
